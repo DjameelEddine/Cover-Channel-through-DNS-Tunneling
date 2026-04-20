@@ -1,0 +1,14 @@
+Preprocessing Configuration
+===========================
+Data Cleaning: Removed duplicates, NaN, inf values
+Outlier Treatment: Log1p transform + 1st/99th percentile clipping
+Feature Selection: Dropped high-corr (>0.95), kept top 20 MI features
+Feature Scaling: RobustScaler (IQR-based, fit on train only)
+Class Balancing: SMOTE on training set
+Train/Val/Test Split: 70% / 15% / 15%
+
+Final Dataset:
+  - Train (balanced): 1,273,376 rows
+  - Val (original): 173,886 rows
+  - Test (original): 173,887 rows
+  - Features: 20
