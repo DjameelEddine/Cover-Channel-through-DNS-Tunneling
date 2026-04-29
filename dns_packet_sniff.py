@@ -60,27 +60,12 @@ class DNSAnalyzer:
             (prediction, confidence)
         """
         try:
-            with open('label_encoder.pkl', 'rb') as f:
-                label_encoder = pickle.load(f)
             with open('scaler.pkl', 'rb') as f:
                 scaler = pickle.load(f)
             
-            # Feature ordering (must match model training)
-            feature_order = [
-                'SourceIP', 'DestinationIP', 'SourcePort', 'DestinationPort',
-                'TimeStamp', 'Duration', 'FlowBytesSent', 'FlowSentRate',
-                'FlowBytesReceived', 'FlowReceivedRate', 'PacketLengthVariance',
-                'PacketLengthStandardDeviation', 'PacketLengthMean', 'PacketLengthMedian',
-                'PacketLengthMode', 'PacketLengthSkewFromMedian', 'PacketLengthSkewFromMode',
-                'PacketLengthCoefficientofVariation', 'PacketTimeVariance',
-                'PacketTimeStandardDeviation', 'PacketTimeMean', 'PacketTimeMedian',
-                'PacketTimeMode', 'PacketTimeSkewFromMedian', 'PacketTimeSkewFromMode',
-                'PacketTimeCoefficientofVariation', 'ResponseTimeTimeVariance',
-                'ResponseTimeTimeStandardDeviation', 'ResponseTimeTimeMean',
-                'ResponseTimeTimeMedian', 'ResponseTimeTimeMode',
-                'ResponseTimeTimeSkewFromMedian', 'ResponseTimeTimeSkewFromMode',
-                'ResponseTimeTimeCoefficientofVariation'
-            ]
+            # Read feature ordering from feature_names.txt
+            with open('feature_names.txt', 'r') as f:
+                feature_order = [line.strip() for line in f if line.strip()]
             
             # Build feature array, converting numpy types to native Python types
             features = []
@@ -92,10 +77,6 @@ class DNSAnalyzer:
                 features.append(val)
             
             features = [features]
-            
-            # Apply label encoder to first 4 features (IPs and Ports) - ensure they are native strings
-            for i in range(4):
-                features[0][i] = label_encoder.transform([str(features[0][i])])[0]
             
             # Convert all features to float for scaler
             features = [[float(f) for f in features[0]]]
@@ -195,11 +176,6 @@ class DNSSniffer:
         
         # Build feature dictionary
         features = {
-            'SourceIP': src_ip,
-            'DestinationIP': dst_ip,
-            'SourcePort': src_port,
-            'DestinationPort': dst_port,
-            'TimeStamp': flow_data['start_time'],
             'Duration': duration,
             'FlowBytesSent': flow_data['bytes_sent'],
             'FlowSentRate': sent_rate,
@@ -213,22 +189,16 @@ class DNSSniffer:
             'PacketLengthSkewFromMedian': pkt_len_skew_median,
             'PacketLengthSkewFromMode': pkt_len_skew_mode,
             'PacketLengthCoefficientofVariation': pkt_len_coeff_var,
-            'PacketTimeVariance': pkt_time_var,
             'PacketTimeStandardDeviation': pkt_time_std,
-            'PacketTimeMean': pkt_time_mean,
             'PacketTimeMedian': pkt_time_median,
-            'PacketTimeMode': pkt_time_mode,
             'PacketTimeSkewFromMedian': pkt_time_skew_median,
             'PacketTimeSkewFromMode': pkt_time_skew_mode,
             'PacketTimeCoefficientofVariation': pkt_time_coeff_var,
-            'ResponseTimeTimeVariance': resp_time_var,
             'ResponseTimeTimeStandardDeviation': resp_time_std,
             'ResponseTimeTimeMean': resp_time_mean,
             'ResponseTimeTimeMedian': resp_time_median,
-            'ResponseTimeTimeMode': resp_time_mode,
             'ResponseTimeTimeSkewFromMedian': resp_time_skew_median,
-            'ResponseTimeTimeSkewFromMode': resp_time_skew_mode,
-            'ResponseTimeTimeCoefficientofVariation': resp_time_coeff_var
+            'ResponseTimeTimeSkewFromMode': resp_time_skew_mode
         }
         
         # Get prediction
