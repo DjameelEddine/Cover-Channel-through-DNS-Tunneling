@@ -5,6 +5,7 @@ Captures DNS queries, extracts features, and detects malicious DNS using pre-tra
 """
 
 import sys
+import os
 import pickle
 import csv
 import math
@@ -24,8 +25,10 @@ warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
 class DNSAnalyzer:
     """Extract features and predict malicious DNS queries."""
     
-    def __init__(self, model_path="model.pkl"):
+    def __init__(self, model_path=None):
         """Initialize analyzer with model."""
+        if model_path is None:
+            model_path = os.path.join(os.path.dirname(__file__), "model.pkl")
         self.model = self.load_model(model_path)
         self.csv_file = "dns_analysis.csv"
         self.packet_count = 0
@@ -54,17 +57,19 @@ class DNSAnalyzer:
         """Predict if flow is malicious.
         
         Args:
-            features_dict: Dictionary with 34 feature values
+            features_dict: Dictionary with 20 feature values
         
         Returns:
             (prediction, confidence)
         """
         try:
-            with open('scaler.pkl', 'rb') as f:
+            scaler_path = os.path.join(os.path.dirname(__file__), 'scaler.pkl')
+            with open(scaler_path, 'rb') as f:
                 scaler = pickle.load(f)
             
             # Read feature ordering from feature_names.txt
-            with open('feature_names.txt', 'r') as f:
+            features_path = os.path.join(os.path.dirname(__file__), 'feature_names.txt')
+            with open(features_path, 'r') as f:
                 feature_order = [line.strip() for line in f if line.strip()]
             
             # Build feature array, converting numpy types to native Python types

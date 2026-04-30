@@ -1,26 +1,28 @@
 # DNS Tunneling Detection System
 
+🎉 **Now available on PyPI!** You can now easily install the package as a CLI tool directly using pip.
+
 A simple DNS packet sniffer that captures network traffic and uses a pre-trained ML model to detect malicious DNS queries (DNS tunneling/CoH attacks).
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Install via pip
 ```bash
-pip install scapy scikit-learn
+pip install dnssniffer
 ```
+*(This automatically installs all required dependencies and bundles the pre-trained ML model!)*
 
-### 2. Ensure Model File Exists
-Place `model.pkl` (pre-trained model) in the project directory.
+### 2. Run the Sniffer
+Because the tool relies on `scapy` for network capturing, you need Administrator or root privileges.
 
-### 3. Run the Sniffer
 **Windows (PowerShell - Admin):**
 ```powershell
-python .\dns_packet_sniff.py
+dnssniffer
 ```
 
 **Linux/macOS:**
 ```bash
-sudo python3 dns_packet_sniff.py
+sudo dnssniffer
 ```
 
 ### 4. View Results
@@ -47,16 +49,16 @@ Results automatically saved to `dns_analysis.csv` with columns:
 
 ```bash
 # Capture unlimited packets (until Ctrl+C)
-python dns_packet_sniff.py
+dnssniffer
 
 # Capture specific number of packets
-python dns_packet_sniff.py -c 1000
+dnssniffer -c 1000
 
 # Use specific network interface
-python dns_packet_sniff.py -i eth0 -c 500
+dnssniffer -i eth0 -c 500
 
 # Both options
-python dns_packet_sniff.py -c 100 -i eth0
+dnssniffer -c 100 -i eth0
 ```
 
 ## How It Works
@@ -178,5 +180,7 @@ This tool detects these patterns using machine learning based on:
 - Results are appended to CSV file (not overwritten)
 
 ## License
-
 Educational use in network security courses.
+
+## Disclaimer
+This tool is for educational and authorized security testing only.

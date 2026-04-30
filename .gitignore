@@ -1,0 +1,6 @@
+dist
+build
+dnssniffer.egg-info
+setup.py
+.vscode
+__pycache__

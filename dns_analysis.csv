@@ -1,2 +1,5 @@
 Flow,Timestamp,Source IP,Destination IP,Source Port,Destination Port,Domain,Packet Count,Duration(s),Bytes Sent,Prediction,Confidence
-1,2026-04-29 10:37:26,10.173.3.249,10.173.3.246,53,52647,alive.github.com,1,0.00,111,BENIGN BENIGN,75.41%
+1,2026-04-30 01:11:27,10.173.3.249,10.173.3.246,53,54360,feature-flags.adidas.com,1,0.00,204,BENIGN BENIGN,75.41%
+2,2026-04-30 01:12:30,10.173.3.246,10.173.3.249,60928,53,www.adidas.com,3,1.17,222,BENIGN BENIGN,75.65%
+3,2026-04-30 01:13:06,10.173.3.246,10.173.3.249,52163,53,mobile.events.data.microsoft.com,1,0.00,92,BENIGN BENIGN,75.41%
+4,2026-04-30 01:13:51,10.173.3.246,10.173.3.249,58554,53,drivefrontend-pa.googleapis.com,4,7.80,385,BENIGN BENIGN,79.98%
