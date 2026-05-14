@@ -97,3 +97,6 @@ See also: [Suspicious Network Behavior Detection](https://github.com/nacermissou
 ## Status
 
 🔧 Active development — extending real-time pipeline and adding cross-dataset evaluation.
+
+## Warning
+- This is an academic project, all details mentioned are for learning and harmless intentions, any harmful usage of any information related to this project assigns the responsibility for the actor, and not any member of the team.
