@@ -182,5 +182,7 @@ This tool detects these patterns using machine learning based on:
 ## License
 Educational use in network security courses.
 
-## Disclaimer
-This tool is for educational and authorized security testing only.
+🔧 Active development — extending real-time pipeline and adding cross-dataset evaluation.
+
+## Warning
+- This is an academic project, all details mentioned are for learning and harmless intentions, any harmful usage of any information related to this project assigns the responsibility for the actor, and not any member of the team.
