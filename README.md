@@ -2,6 +2,8 @@
 
 🎉 **Now available on PyPI!** You can now easily install the package as a CLI tool directly using pip.
 
+![Project Demo](DNS%20project%20animation.png))
+
 A simple DNS packet sniffer that captures network traffic and uses a pre-trained ML model to detect malicious DNS queries (DNS tunneling/CoH attacks).
 
 ## Quick Start
