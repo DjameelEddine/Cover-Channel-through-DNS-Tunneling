@@ -57,7 +57,7 @@ class DNSAnalyzer:
         """Predict if flow is malicious.
         
         Args:
-            features_dict: Dictionary with 20 feature values
+            features_dict: Dictionary with 31 feature values
         
         Returns:
             (prediction, confidence)
@@ -67,18 +67,24 @@ class DNSAnalyzer:
             with open(scaler_path, 'rb') as f:
                 scaler = pickle.load(f)
             
-            # Read feature ordering from feature_names.txt
             features_path = os.path.join(os.path.dirname(__file__), 'feature_names.txt')
             with open(features_path, 'r') as f:
                 feature_order = [line.strip() for line in f if line.strip()]
+
+            log1p_path = os.path.join(os.path.dirname(__file__), 'log1p_features.txt')
+            with open(log1p_path, 'r') as f:
+                log1p_features = set(line.strip() for line in f if line.strip())
             
-            # Build feature array, converting numpy types to native Python types
             features = []
             for k in feature_order:
-                val = features_dict[k]
+                val = features_dict.get(k, 0)
                 # Convert numpy types to native Python types
                 if isinstance(val, np.generic):
                     val = val.item()
+                val = float(val)
+                # Apply log1p transformation if required
+                if k in log1p_features:
+                    val = np.log1p(val)
                 features.append(val)
             
             features = [features]
@@ -86,8 +92,9 @@ class DNSAnalyzer:
             # Convert all features to float for scaler
             features = [[float(f) for f in features[0]]]
             
-            # Apply scaler to all features
             scaled = scaler.transform(features)
+
+
             
             pred = self.model.predict(scaled)[0]
             prob = max(self.model.predict_proba(scaled)[0])
@@ -116,8 +123,34 @@ class DNSSniffer:
             'bytes_sent': 0,
             'bytes_received': 0,
             'start_time': None,
+            'last_packet_time': None,
             'domains': []
         })
+    
+    @staticmethod
+    def calculate_entropy(text):
+        """Calculate Shannon entropy for text."""
+        if not text: return 0
+        entropy = 0
+        for count in Counter(text).values():
+            p = count / len(text)
+            entropy -= p * math.log2(p)
+        return entropy
+
+    @staticmethod
+    def count_non_printable(text):
+        """Count non-printable characters."""
+        if not text: return 0
+        return len([c for c in str(text) if not (32 <= ord(c) <= 126)])
+
+    @staticmethod
+    def digit_letter_ratio(text):
+        """Calculate digit to letter ratio."""
+        if not text: return 0
+        text_str = str(text)
+        digits = sum(c.isdigit() for c in text_str)
+        letters = sum(c.isalpha() for c in text_str)
+        return digits / letters if letters > 0 else digits
     
     @staticmethod
     def calc_statistics(values):
@@ -141,18 +174,28 @@ class DNSSniffer:
     def get_flow_key(self, packet):
         """Extract flow identifier from packet."""
         try:
-            src_ip = packet[IP].src if packet.haslayer(IP) else "0.0.0.0"
-            dst_ip = packet[IP].dst if packet.haslayer(IP) else "0.0.0.0"
-            src_port = packet[UDP].sport if packet.haslayer(UDP) else 0
-            dst_port = packet[UDP].dport if packet.haslayer(UDP) else 53
-            return (src_ip, dst_ip, src_port, dst_port)
+            ip_src = packet[IP].src if packet.haslayer(IP) else "0.0.0.0"
+            ip_dst = packet[IP].dst if packet.haslayer(IP) else "0.0.0.0"
+            port_src = packet[UDP].sport if packet.haslayer(UDP) else 0
+            port_dst = packet[UDP].dport if packet.haslayer(UDP) else 53
+            
+            # Create bidirectional flow key (so queries and responses map to the same flow)
+            if ip_src < ip_dst:
+                return (ip_src, port_src, ip_dst, port_dst)
+            elif ip_src > ip_dst:
+                return (ip_dst, port_dst, ip_src, port_src)
+            else:
+                if port_src < port_dst:
+                    return (ip_src, port_src, ip_dst, port_dst)
+                else:
+                    return (ip_dst, port_dst, ip_src, port_src)
         except:
             return None
     
     def analyze_flow(self, flow_key, flow_data):
         """Analyze a complete flow and make prediction."""
         self.flow_num += 1
-        src_ip, dst_ip, src_port, dst_port = flow_key
+        src_ip, src_port, dst_ip, dst_port = flow_key
         
         current_time = datetime.now().timestamp()
         
@@ -179,8 +222,27 @@ class DNSSniffer:
         
         domain = flow_data['domains'][0] if flow_data['domains'] else ""
         
-        # Build feature dictionary
+        # Calculate domain features
+        domains = flow_data['domains']
+        entropy = [self.calculate_entropy(d) for d in domains]
+        domain_len = [len(d) for d in domains]
+        non_printable = [self.count_non_printable(d) for d in domains]
+        dig_let_ratio = [self.digit_letter_ratio(d) for d in domains]
+        unique_subdomains = len(set(domains))
+        nx_ratio = 0
+        query_rate = len(flow_data['packets']) / duration
+        response_size_var = np.var(pkt_sizes) if len(pkt_sizes) > 1 else 0
+    
+
         features = {
+            'Character_frequency_entropy': sum(entropy) / len(entropy) if entropy else 0,
+            'Domain_name_length': max(domain_len) if domain_len else 0,
+            'Non_printable_character_count': sum(non_printable),
+            'Digit_letter_ratio': sum(dig_let_ratio) / len(dig_let_ratio) if dig_let_ratio else 0,
+            'Unique_subdomains_per_flow': unique_subdomains,
+            'NXDomain_ratio': nx_ratio,
+            'Query_rate_per_sec': query_rate,
+            'Response_size_variance': response_size_var,
             'Duration': duration,
             'FlowBytesSent': flow_data['bytes_sent'],
             'FlowSentRate': sent_rate,
@@ -206,12 +268,12 @@ class DNSSniffer:
             'ResponseTimeTimeSkewFromMode': resp_time_skew_mode
         }
         
-        # Get prediction
+
         pred, conf = self.analyzer.predict(features)
         
         pred_label = "MALICIOUS [!]" if pred == 1 else "BENIGN [OK]"
         
-        # Display flow info
+
         print(f"\n[Flow #{self.flow_num}] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"  From: {src_ip}:{src_port} → {dst_ip}:{dst_port}")
         print(f"  Domain: {domain}")
@@ -249,12 +311,16 @@ class DNSSniffer:
                 if not flow_key:
                     return
                 
-                src_ip, dst_ip, src_port, dst_port = flow_key
+                # Check if this packet is a query (going to port 53) or a response (coming from port 53)
+                # Since get_flow_key sorts IPs/ports, we need to look at the actual packet to determine direction
+                is_query = (packet.haslayer(UDP) and packet[UDP].dport == 53)
+                
                 current_time = datetime.now().timestamp()
                 
                 # Initialize flow if new
                 if not self.flows[flow_key]['start_time']:
                     self.flows[flow_key]['start_time'] = current_time
+                    self.flows[flow_key]['last_packet_time'] = current_time
                 
                 flow = self.flows[flow_key]
                 packet_size = len(packet)
@@ -262,12 +328,22 @@ class DNSSniffer:
                 # Track packet data
                 flow['packets'].append(self.packet_num)
                 flow['packet_sizes'].append(packet_size)
-                flow['bytes_sent'] += packet_size
+                
+                if is_query:
+                    flow['bytes_sent'] += packet_size
+                else:
+                    flow['bytes_received'] += packet_size
+                    # Simple tracked response time: time since the last packet in flow (assuming it was the request)
+                    if len(flow['packets']) > 1:
+                        resp_time = current_time - flow['last_packet_time']
+                        flow['response_times'].append(resp_time)
                 
                 # Track inter-packet times
-                if len(flow['packet_times']) > 0:
-                    inter_arrival = current_time - (flow['start_time'] + sum(flow['packet_times']))
+                if len(flow['packets']) > 1:
+                    inter_arrival = current_time - flow['last_packet_time']
                     flow['packet_times'].append(inter_arrival)
+                    
+                flow['last_packet_time'] = current_time
                 
                 # Extract domain
                 dns_layer = packet[DNS]
@@ -290,6 +366,7 @@ class DNSSniffer:
                         'bytes_sent': 0,
                         'bytes_received': 0,
                         'start_time': current_time,
+                        'last_packet_time': current_time,
                         'domains': flow['domains']
                     }
         

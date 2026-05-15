@@ -4,3 +4,10 @@ dnssniffer.egg-info
 setup.py
 .vscode
 __pycache__
+project_explanation.tex
+dnssniffer/normal
+dnssniffer/tunnel
+dnssniffer/pcap_to_csv.py
+DNS_dataset.csv
+DNS_dataset.rar
+Technical_Report.tex
